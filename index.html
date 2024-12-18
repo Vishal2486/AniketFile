@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ROS Log Viewer</title>
+  <!-- React and ReactDOM CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <!-- Babel for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    /* CSS Styling */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f8f9fa;
+      margin: 0;
+      padding: 0;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    .file-upload {
+      display: flex;
+      justify-content: center;
+      margin: 20px;
+    }
+
+    .file-upload input {
+      margin-right: 10px;
+    }
+
+    .filters {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+
+    .filters select, .filters input {
+      margin: 0 10px;
+      padding: 5px;
+    }
+
+    table {
+      width: 90%;
+      margin: 20px auto;
+      border-collapse: collapse;
+      box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    .error-log {
+      background-color: #f8d7da; /* Light red */
+    }
+
+    .warn-log {
+      background-color: #fff3cd; /* Light yellow */
+    }
+
+    input, button, select {
+      padding: 8px;
+      font-size: 14px;
+      border-radius: 5px;
+      border: 1px solid #ddd;
+    }
+
+    button {
+      background-color: #4CAF50;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // React App Component
+    function App() {
+      const [file, setFile] = React.useState(null);
+      const [logs, setLogs] = React.useState([]);
+      const [filterLevel, setFilterLevel] = React.useState("");
+      const [searchQuery, setSearchQuery] = React.useState("");
+
+      // Handle file selection
+      const handleFileChange = (e) => {
+        setFile(e.target.files[0]);
+      };
+
+      // Upload file to backend
+      const handleFileUpload = async () => {
+        if (!file) {
+          alert("Please select a file first.");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+          const response = await fetch("http://127.0.0.1:8000/upload/", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) throw new Error("Failed to upload file");
+
+          const data = await response.json();
+          setLogs(data.logs);
+        } catch (error) {
+          console.error("Error uploading file:", error);
+          alert("Failed to upload or parse the log file.");
+        }
+      };
+
+      // Filter and search logs
+      const filteredLogs = logs.filter((log) => {
+        const matchesLevel = filterLevel ? log.level === filterLevel : true;
+        const matchesSearch = searchQuery
+          ? log.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            log.node.toLowerCase().includes(searchQuery.toLowerCase())
+          : true;
+        return matchesLevel && matchesSearch;
+      });
+
+      // Highlight specific log levels
+      const getRowClass = (level) => {
+        if (level === "ERROR") return "error-log";
+        if (level === "WARN") return "warn-log";
+        return "";
+      };
+
+      return (
+        <div>
+          <h1>ROS Log Viewer</h1>
+
+          {/* File Upload Section */}
+          <div className="file-upload">
+            <input type="file" accept=".log,.txt" onChange={handleFileChange} />
+            <button onClick={handleFileUpload}>Upload Log File</button>
+          </div>
+
+          {/* Filters */}
+          <div className="filters">
+            <select onChange={(e) => setFilterLevel(e.target.value)}>
+              <option value="">All Severity Levels</option>
+              <option value="INFO">INFO</option>
+              <option value="WARN">WARN</option>
+              <option value="ERROR">ERROR</option>
+              <option value="DEBUG">DEBUG</option>
+            </select>
+            <input
+              type="text"
+              placeholder="Search logs..."
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          {/* Logs Table */}
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Severity</th>
+                <th>Node</th>
+                <th>Message</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredLogs.length > 0 ? (
+                filteredLogs.map((log, index) => (
+                  <tr key={index} className={getRowClass(log.level)}>
+                    <td>{log.timestamp}</td>
+                    <td>{log.level}</td>
+                    <td>{log.node}</td>
+                    <td>{log.message}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="4">No logs to display</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    // Render the React App
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>                     
